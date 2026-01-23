@@ -1,0 +1,19 @@
+# Data & Logs
+*.log
+*.webp
+*.png
+cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+
+# System
+.DS_Store
+Thumbs.db
