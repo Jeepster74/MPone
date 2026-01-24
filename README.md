@@ -9,26 +9,30 @@ The pipeline enriches a base list of karting locations with high-fidelity data f
 
 ## 📁 Project Structure
 To support future scalability (e.g., dashboard integration), the project is organized into modules:
-- `data/`: Contains the base and enriched CSV datasets.
+- `data/`: Contains the base and enriched CSV datasets, plus `karting_shapes.geojson`.
 - `scripts/`: Python orchestration scripts for the enrichment pipeline.
 - `market-analysis/`: (Current) Data processing and analysis module.
 
 ## 🛠 Setup & Usage
 1.  **Install Dependencies**:
     ```bash
-    pip install pandas osmnx playwright deep-translator
+    pip install pandas osmnx playwright deep-translator eurostat openrouteservice geopandas
     playwright install chromium
     ```
 2.  **Run Enrichment**:
     ```bash
     # Step 1: Google Maps Data
     python scripts/enrich_karting.py
-    # Step 2: OpenStreetMap Data
+    # Step 2: OpenStreetMap & Wealth Data
     python scripts/enrich_osm.py
+    python scripts/enrich_wealth.py
+    # Step 3: Catchment Reach (ORS API Key Required)
+    python scripts/enrich_reach.py
     ```
 
 ## 📈 Roadmap
 - [x] Data Extraction & Scraping
 - [x] OSM Physical Enrichment
+- [x] Eurostat Regional Wealth Enrichment
+- [/] Drive-time Reach Isochrones (In Progress)
 - [ ] Interactive Dashboard (Next Phase)
-- [ ] Market Penetration Analytics

@@ -1,0 +1,100 @@
+{
+  "indoor": {
+    "en": [
+      "indoor",
+      "covered",
+      "warehouse",
+      "hall",
+      "multi-level",
+      "ventilation"
+    ],
+    "nl": [
+      "indoor",
+      "binnenbaan",
+      "overdekt",
+      "hal",
+      "etages"
+    ],
+    "fr": [
+      "indoor",
+      "couvert",
+      "halle",
+      "piste couverte",
+      "multiniveau"
+    ],
+    "de": [
+      "indoor",
+      "halle",
+      "überdacht",
+      "hallenbahn",
+      "mehrstöckig"
+    ]
+  },
+  "outdoor": {
+    "en": [
+      "outdoor",
+      "open air",
+      "asphalt",
+      "circuit",
+      "track surface",
+      "sun",
+      "rain"
+    ],
+    "nl": [
+      "outdoor",
+      "buitenbaan",
+      "openlucht",
+      "asfalt",
+      "zon",
+      "regen"
+    ],
+    "fr": [
+      "outdoor",
+      "plein air",
+      "extérieur",
+      "asphalte",
+      "soleil",
+      "pluie"
+    ],
+    "de": [
+      "outdoor",
+      "aussenbahn",
+      "freiluft",
+      "asphalt",
+      "sonne",
+      "regen"
+    ]
+  },
+  "sim": {
+    "en": [
+      "sim",
+      "simulator",
+      "sim racing",
+      "sim-racing",
+      "esports",
+      "virtual racing",
+      "iracing"
+    ],
+    "nl": [
+      "sim",
+      "simulator",
+      "simracing",
+      "virtueel racen",
+      "esports"
+    ],
+    "fr": [
+      "sim",
+      "simulateur",
+      "sim-racing",
+      "virtuel",
+      "esports"
+    ],
+    "de": [
+      "sim",
+      "simulator",
+      "simracing",
+      "virtuelles rennen",
+      "esports"
+    ]
+  }
+}
