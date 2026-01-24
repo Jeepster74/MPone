@@ -29,10 +29,20 @@ To support future scalability (e.g., dashboard integration), the project is orga
     # Step 3: Catchment Reach (ORS API Key Required)
     python scripts/enrich_reach.py
     ```
+3.  **Access the Dashboard**:
+    ```bash
+    ./run_dashboard.sh
+    ```
+
+## 🔐 Dashboard Access
+The dashboard is secured for up to 20 authorized users.
+- **URL**: `http://localhost:8501`
+- **Default User**: `jaap`
+- **Default Password**: `admin123`
 
 ## 📈 Roadmap
 - [x] Data Extraction & Scraping
 - [x] OSM Physical Enrichment
 - [x] Eurostat Regional Wealth Enrichment
-- [/] Drive-time Reach Isochrones (In Progress)
-- [ ] Interactive Dashboard (Next Phase)
+- [/] Drive-time Reach Isochrones (Running in background)
+- [/] Secure Interactive Dashboard (MVP Ready)

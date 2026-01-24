@@ -1,0 +1,13 @@
+credentials:
+  usernames:
+    jaap:
+      email: jaap@mponemedia.com
+      name: Jaap van Oort
+      password: $2b$12$oMCSAHK8gh.SZWQGNi/n8eBaw82ISuSKXKvzx6biuRKHb0jrQDcFW # admin123
+cookie:
+  expiry_days: 30
+  key: mpone_dashboard_cookie
+  name: mpone_dashboard_cookie
+pre-authorized:
+  emails:
+  - jaap@mponemedia.com
