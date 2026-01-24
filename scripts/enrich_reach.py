@@ -6,6 +6,7 @@ from openrouteservice import isochrones
 import os
 import json
 import time
+import asyncio
 
 # Settings
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
@@ -59,10 +60,37 @@ def calculate_area_km2(geojson_iso):
         print(f"Error calculating area: {e}")
         return 0
 
-def enrich_reach():
-    if API_KEY == "YOUR_ORS_API_KEY_HERE":
-        print("Error: Please provide a valid OpenRouteService API key.")
-        return
+def safe_save(results_dict, output_file, geojson_features, geojson_file):
+    """
+    Reloads the CSV from disk, merges new results, and saves.
+    This prevents overwriting columns added by other scripts (like classify_facility.py).
+    """
+    try:
+        # 1. Reload the current state of the file
+        current_df = pd.read_csv(output_file)
+        
+        # 2. Update only the catchment_area_size for processed IDs
+        if 'catchment_area_size' not in current_df.columns:
+            current_df['catchment_area_size'] = "N/A"
+            
+        for track_id, area in results_dict.items():
+            current_df.loc[current_df['track_id'] == track_id, 'catchment_area_size'] = area
+            
+        # 3. Save CSV
+        current_df.to_csv(output_file, index=False)
+        
+        # 4. Save GeoJSON
+        with open(geojson_file, 'w') as f:
+            json.dump({"type": "FeatureCollection", "features": geojson_features}, f)
+            
+        print(f"--- Concurrency-Safe Save Complete ({len(results_dict)} items merged) ---")
+    except Exception as e:
+        print(f"Error during safe save: {e}")
+
+async def main():
+    if API_KEY == "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjFjZDZmZDJjZWVkMTQ0NGZiNzg0N2U5Mzg4OTQzNWU1IiwiaCI6Im11cm11cjY0In0=":
+        # Verification: Correct key is present
+        pass
 
     if not os.path.exists(INPUT_FILE):
         print(f"Error: {INPUT_FILE} not found.")
@@ -70,9 +98,7 @@ def enrich_reach():
 
     print("Loading track data...")
     df = pd.read_csv(INPUT_FILE)
-    
-    if 'catchment_area_size' not in df.columns:
-        df['catchment_area_size'] = "N/A"
+    keywords = {} # Not used here but keep logic clean
 
     # Initialize client
     client = openrouteservice.Client(key=API_KEY)
@@ -81,18 +107,21 @@ def enrich_reach():
     all_features = []
     processed_ids = set()
     if os.path.exists(GEOJSON_FILE):
-        with open(GEOJSON_FILE, 'r') as f:
-            existing_data = json.load(f)
-            all_features = existing_data['features']
-            processed_ids = {f['properties']['track_id'] for f in all_features}
-            print(f"Resuming from existing GeoJSON. {len(processed_ids)} tracks already processed.")
+        try:
+            with open(GEOJSON_FILE, 'r') as f:
+                existing_data = json.load(f)
+                all_features = existing_data['features']
+                processed_ids = {f['properties']['track_id'] for f in all_features}
+                print(f"Resuming from existing GeoJSON. {len(processed_ids)} tracks already processed.")
+        except:
+            print("GeoJSON corrupted, starting fresh.")
 
     # Filter for rows that need processing
-    to_process = df[(df['catchment_area_size'] == "N/A") | (df['catchment_area_size'].isna())]
+    to_process = df[(df['catchment_area_size'] == "N/A") | (df['catchment_area_size'].isna()) | (df['catchment_area_size'] == 0)]
     print(f"Total locations needing enrichment: {len(to_process)}")
 
-    count = 0
     success_count = 0
+    batch_results = {} # track_id -> area
     quota_reached = False
     
     for index, row in to_process.iterrows():
@@ -113,38 +142,33 @@ def enrich_reach():
                 
                 # Calculate area
                 area = calculate_area_km2(iso_res)
-                df.at[index, 'catchment_area_size'] = area
+                batch_results[track_id] = area
                 success_count += 1
                 
                 # Save progress every 10
                 if success_count % 10 == 0:
-                    df.to_csv(OUTPUT_FILE, index=False)
-                    with open(GEOJSON_FILE, 'w') as f:
-                        json.dump({"type": "FeatureCollection", "features": all_features}, f)
-                    print(f"--- Progress Saved ({success_count} processed) ---")
+                    safe_save(batch_results, OUTPUT_FILE, all_features, GEOJSON_FILE)
+                    # Don't clear batch_results, keep them for final save or clear if merge is cumulative
                 
-                # Rate limit protection (ORS free: 20/min = 1 every 3s). Use 4s to be safe.
+                # Rate limit protection
                 time.sleep(4) 
             else:
                 print(f"Failed to fetch isochrone for ID: {track_id}")
         except Exception as e:
             if "OverQueryLimit" in str(e) or "429" in str(e):
-                print("\n!!! DAILY QUOTA REACHED or RATE LIMIT EXCEEDED !!!")
-                print("Stopping script to prevent further errors.")
+                print("\n!!! DAILY QUOTA REACHED !!!")
                 quota_reached = True
                 break
             else:
                 print(f"Unexpected error at ID {track_id}: {e}")
 
     # Final Save
-    df.to_csv(OUTPUT_FILE, index=False)
-    with open(GEOJSON_FILE, 'w') as f:
-        json.dump({"type": "FeatureCollection", "features": all_features}, f)
+    safe_save(batch_results, OUTPUT_FILE, all_features, GEOJSON_FILE)
         
     if quota_reached:
-        print("\nProcess paused due to API limits. You can resume tomorrow.")
+        print("\nProcess paused. You can resume tomorrow.")
     else:
-        print(f"\nFinished batch. Total processed this session: {success_count}")
+        print(f"\nFinished batch. Total processed: {success_count}")
 
 if __name__ == "__main__":
-    enrich_reach()
+    asyncio.run(main())

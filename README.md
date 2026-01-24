@@ -29,20 +29,27 @@ To support future scalability (e.g., dashboard integration), the project is orga
     # Step 3: Catchment Reach (ORS API Key Required)
     python scripts/enrich_reach.py
     ```
-3.  **Access the Dashboard**:
+3.  **Launch Premium Intelligence Dashboard**:
     ```bash
-    ./run_dashboard.sh
+    # Open your terminal and run:
+    ./run_premium_dashboard.sh
     ```
 
-## 🔐 Dashboard Access
-The dashboard is secured for up to 20 authorized users.
-- **URL**: `http://localhost:8501`
-- **Default User**: `jaap`
-- **Default Password**: `admin123`
+## 🏎️ Premium Dashboard (Next-Gen)
+The new **Vite + React + FastAPI** dashboard follows the **'Nano Banana'** aesthetic with MP Motorsport branding.
+- **UX**: Mapbox heatmaps, side-pane 'Golden Records', and a permanent wishlist.
+- **Deployment**: Powered by **Docker** to ensure all dependencies (Node.js, React) are managed automatically.
+- **Access**: `http://localhost:8000` (FastAPI + React Bundle)
+- **Credential Creation**: Use `premium-dashboard/backend/users.json` to manage access for up to 20 users.
+
+## 📁 Data Dictionary (Glossary)
+- **Disposable Income (PPS)**: Regional wealth index from Eurostat.
+- **Catchment Area (km²)**: 30-min drive-time reach from ORS API.
+- **Building SQM**: Physical footprint from OSM polygons.
 
 ## 📈 Roadmap
 - [x] Data Extraction & Scraping
 - [x] OSM Physical Enrichment
 - [x] Eurostat Regional Wealth Enrichment
-- [/] Drive-time Reach Isochrones (Running in background)
-- [/] Secure Interactive Dashboard (MVP Ready)
+- [/] Drive-time Reach Isochrones (Running in background; Safe-Save active)
+- [x] Premium 'Nano Banana' Dashboard (V1 Launch)

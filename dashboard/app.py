@@ -43,17 +43,19 @@ authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
     config['cookie']['key'],
-    config['cookie']['expiry_days'],
-    config['pre-authorized']
+    config['cookie']['expiry_days']
 )
 
-name, authentication_status, username = authenticator.login('main')
+authenticator.login(location='main')
 
-if authentication_status == False:
+if st.session_state['authentication_status'] == False:
     st.error('Username/password is incorrect')
-elif authentication_status == None:
+elif st.session_state['authentication_status'] == None:
     st.warning('Please enter your username and password')
-elif authentication_status:
+elif st.session_state['authentication_status']:
+    # Get user info from state
+    name = st.session_state['name']
+    username = st.session_state['username']
     # 2. DATA LOADING
     @st.cache_data(ttl=60) # Refresh every minute to pick up background script updates
     def load_data():
