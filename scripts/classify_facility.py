@@ -54,8 +54,11 @@ async def check_website(url, keywords):
 def classify_by_footprint(sqm):
     try:
         sqm = float(sqm)
-        if sqm > 1500: return "Indoor"
-        if sqm < 300 and sqm > 0: return "Outdoor"
+        # Indoor karts typically operate in 1,000 - 6,000 sqm warehouses.
+        # Sites > 10,000 sqm are likely entire outdoor circuit grounds.
+        if sqm > 1000 and sqm < 10000: return "Indoor"
+        if sqm >= 10000: return "Outdoor" # Massive polygon = likely ground footprint
+        if sqm < 300 and sqm > 0: return "Small" # Skip tiny/storage buildings
         return None
     except:
         return None
@@ -93,6 +96,11 @@ async def main():
     # for tracks that don't have SIM in the name.
     
     for index, row in df.iterrows():
+        # Reset flags for fresh evaluation
+        df.at[index, 'is_indoor'] = False
+        df.at[index, 'is_outdoor'] = False
+        df.at[index, 'is_sim'] = False
+
         name = str(row['Name']).lower()
         snippet = str(row['Top Reviews Snippet']).lower()
         

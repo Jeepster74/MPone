@@ -7,8 +7,11 @@ import os
 import geopandas as gpd
 
 # Settings
-INPUT_FILE = "../data/karting_enriched.csv"
-OUTPUT_FILE = "../data/karting_enriched.csv"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+INPUT_FILE = os.path.join(DATA_DIR, "karting_enriched.csv")
+OUTPUT_FILE = os.path.join(DATA_DIR, "karting_enriched.csv")
 TEST_LIMIT = None # Set to None for full run
 
 def get_osm_data(lat, lon):
@@ -22,15 +25,23 @@ def get_osm_data(lat, lon):
     }
     
     try:
-        # 1. Building Footprint (Small radius = Fast)
+        # 1. Building Footprint (Prioritize building tags)
         try:
-            footprint_tags = {'building': True, 'leisure': 'sports_centre'}
-            footprint_features = ox.features_from_point(point, tags=footprint_tags, dist=300)
+            # Try strict building search first
+            footprint_tags = {'building': True}
+            footprint_features = ox.features_from_point(point, tags=footprint_tags, dist=150)
             
             p_geom = Point(lon, lat)
             polygons = footprint_features[footprint_features.geometry.type.isin(['Polygon', 'MultiPolygon'])]
             
+            # If no strict buildings found, fallback to sports_centre in a wider radius
+            if polygons.empty:
+                footprint_tags = {'leisure': 'sports_centre'}
+                footprint_features = ox.features_from_point(point, tags=footprint_tags, dist=300)
+                polygons = footprint_features[footprint_features.geometry.type.isin(['Polygon', 'MultiPolygon'])]
+
             if not polygons.empty:
+                # Find the polygon containing the point, or the nearest one
                 containing = polygons[polygons.intersects(p_geom)]
                 if not containing.empty:
                     target = containing.head(1)
@@ -40,7 +51,21 @@ def get_osm_data(lat, lon):
                     target = polygons.nsmallest(1, 'dist')
                 
                 target_proj = ox.projection.project_gdf(target)
-                res['building_sqm'] = round(target_proj.geometry.area.iloc[0], 2)
+                area = target_proj.geometry.area.iloc[0]
+                
+                # If area is clearly a whole circuit ground (> 20k sqm), we strictly check for smaller sub-polygons
+                if area > 20000:
+                    try:
+                        # Re-query inside this large polygon for actual buildings
+                        sub_features = ox.features_from_point(point, tags={'building': True}, dist=100)
+                        sub_polys = sub_features[sub_features.geometry.type.isin(['Polygon', 'MultiPolygon'])]
+                        if not sub_polys.empty:
+                            target_proj = ox.projection.project_gdf(sub_polys.head(1))
+                            area = target_proj.geometry.area.iloc[0]
+                    except:
+                        pass
+                        
+                res['building_sqm'] = round(area, 2)
         except:
             pass # No footprint found locally
 

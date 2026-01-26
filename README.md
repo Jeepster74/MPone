@@ -38,8 +38,9 @@ To support future scalability (e.g., dashboard integration), the project is orga
 ## 🏎️ Premium Dashboard (Next-Gen)
 The new **Vite + React + FastAPI** dashboard follows the **'Nano Banana'** aesthetic with MP Motorsport branding.
 - **UX**: Mapbox heatmaps, side-pane 'Golden Records', and a permanent wishlist.
-- **Deployment**: Powered by **Docker** to ensure all dependencies (Node.js, React) are managed automatically.
+- **Deployment**: Powered by **Docker** for local use and **Google Cloud Run** for production.
 - **Access**: `http://localhost:8000` (FastAPI + React Bundle)
+- **Deployment Guide**: See [DEPLOY_GCP.md](file:///Users/jaap.vanoort/Documents/MP%20One/Market%20Analysis/premium-dashboard/DEPLOY_GCP.md) for cloud instructions.
 - **Credential Creation**: Use `premium-dashboard/backend/users.json` to manage access for up to 20 users.
 
 ## 📁 Data Dictionary (Glossary)
@@ -51,5 +52,6 @@ The new **Vite + React + FastAPI** dashboard follows the **'Nano Banana'** aesth
 - [x] Data Extraction & Scraping
 - [x] OSM Physical Enrichment
 - [x] Eurostat Regional Wealth Enrichment
-- [/] Drive-time Reach Isochrones (Running in background; Safe-Save active)
+- [/] Drive-time Reach Isochrones (Running in background; Safe-Save active; ~2,000 tracks pending)
 - [x] Premium 'Nano Banana' Dashboard (V1 Launch)
+- [x] Google Cloud Environment Setup

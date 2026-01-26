@@ -7,9 +7,12 @@ import re
 from datetime import datetime, timedelta
 
 # Settings
-INPUT_FILE = "../data/karting_locations.csv"
-OUTPUT_FILE = "../data/karting_enriched.csv"
-BATCH_SIZE = 5 # Small batch for initial run/test
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+INPUT_FILE = os.path.join(DATA_DIR, "karting_enriched.csv")
+OUTPUT_FILE = os.path.join(DATA_DIR, "karting_enriched.csv")
+BATCH_SIZE = 50 # Larger batch for SIM expansion
 HEADLESS = True
 
 # Keywords for sentiment analysis
@@ -275,8 +278,10 @@ async def main():
         
         processed_count = 0
         for index, row in df.iterrows():
-            if str(row['Review Velocity (12m)']) != "N/A":
-                continue # Skip already enriched
+            # Skip if already enriched (not NaN, not N/A, not FAILED, not empty)
+            val = str(row['Review Velocity (12m)'])
+            if val not in ["N/A", "nan", "FAILED", ""]:
+                continue
                 
             res = await get_google_maps_data(page, row['Name'], row['City'], row['Country'])
             if res:

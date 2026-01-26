@@ -3,41 +3,55 @@ import json
 import os
 from typing import List, Optional
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV_PATH = os.path.join(ROOT_DIR, "data", "karting_enriched.csv")
 GEOJSON_PATH = os.path.join(ROOT_DIR, "data", "karting_shapes.geojson")
 WISHLIST_PATH = os.path.join(ROOT_DIR, "data", "wishlist.json")
 
 def get_tracks_data():
     """
-    Safely reads the enriched CSV in read-only mode.
+    Safely reads the enriched CSV and robustly sanitizes for JSON.
     """
+    import math
+    
+    def sanitize(v):
+        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+            return None
+        return v
+
     try:
-        # Use low_memory=False to ensure stable data types
-        # Open in read-only mode explicitly
-        with open(CSV_PATH, 'r') as f:
-            df = pd.read_csv(f)
+        if not os.path.exists(CSV_PATH):
+            return []
             
-        # Fill NaNs for JSON stability
-        df = df.fillna({
-            "City": "N/A",
-            "Website": "N/A",
-            "Top Reviews Snippet": "No current reviews",
-            "catchment_area_size": 0
-        })
-        return df.to_dict(orient="records")
+        df = pd.read_csv(CSV_PATH)
+        raw_data = df.to_dict(orient="records")
+        
+        # Manually sanitize every field to ensure JSON compliance
+        clean_data = [
+            {k: sanitize(v) for k, v in record.items()}
+            for record in raw_data
+        ]
+        
+        return clean_data
     except Exception as e:
         print(f"Error reading CSV: {e}")
         return []
 
+_cached_geojson = None
+
 def get_geojson_data():
     """
-    Safely reads the shapes file.
+    Safely reads and caches the shapes file to avoid repeated disk I/O and parsing.
     """
+    global _cached_geojson
+    if _cached_geojson is not None:
+        return _cached_geojson
+        
     try:
         if os.path.exists(GEOJSON_PATH):
             with open(GEOJSON_PATH, 'r') as f:
-                return json.load(f)
+                _cached_geojson = json.load(f)
+                return _cached_geojson
         return {"type": "FeatureCollection", "features": []}
     except Exception as e:
         print(f"Error reading GeoJSON: {e}")

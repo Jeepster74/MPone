@@ -1,6 +1,7 @@
 # 1. BUILD FRONTEND (Node)
 FROM node:20-slim AS frontend-build
 WORKDIR /app/frontend
+
 COPY frontend/package.json ./
 RUN npm install
 COPY frontend/ ./
@@ -20,6 +21,6 @@ COPY backend/ ./backend
 # Copy built frontend (Static files)
 COPY --from=frontend-build /app/frontend/dist ./static
 
-# Expose port and launch
-EXPOSE 8000
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Expose port (Cloud Run uses 8080 by default, but we'll use $PORT)
+EXPOSE 8080
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8080}

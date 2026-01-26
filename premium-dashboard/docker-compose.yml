@@ -1,9 +1,8 @@
 services:
   app:
-    build: .
+    build:
+      context: .
     ports:
-      - "8000:8000"
+      - "8000:8080"
     volumes:
       - ../data:/app/data
-    environment:
-      - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
