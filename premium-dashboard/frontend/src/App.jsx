@@ -25,6 +25,7 @@ function App() {
       minReach: 0
    });
    const [isLoading, setIsLoading] = useState(true);
+   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
    const mapContainer = useRef(null);
    const map = useRef(null);
    const isochroneLayer = useRef(null);
@@ -497,11 +498,33 @@ function App() {
 
    return (
       <div className="h-screen w-screen overflow-hidden flex flex-col bg-mp-black text-slate-100 relative font-['Inter',sans-serif]">
-         {isLoading && (
+         {(isLoading || !disclaimerAccepted) && (
             <div className="preloader-overlay">
-               <div className="flex flex-col items-center">
-                  <img src="/logo.png" className="h-24 object-contain animate-pulse mb-8" alt="MP One" />
-                  <div className="text-[10px] font-black tracking-[0.4em] text-mp-orange uppercase">Initiating Data Feeds</div>
+               <div className="flex flex-col items-center max-w-lg px-10 text-center">
+                  <img src="/logo.png" className="h-24 object-contain mb-8" alt="MP One" />
+
+                  {isLoading ? (
+                     <div className="flex flex-col items-center">
+                        <div className="w-12 h-12 border-4 border-mp-orange/20 border-t-mp-orange rounded-full animate-spin mb-4"></div>
+                        <div className="text-[10px] font-black tracking-[0.4em] text-mp-orange uppercase">Initiating Data Feeds</div>
+                     </div>
+                  ) : (
+                     <div className="space-y-8 animate-in fade-in zoom-in duration-500">
+                        <div className="space-y-4">
+                           <h2 className="text-xl font-black text-white italic tracking-tight">DATA DISCLAIMER</h2>
+                           <p className="text-slate-400 text-sm leading-relaxed">
+                              Data is collected from online sources, and may be partly incomplete or inaccurate.
+                              The information provided is for intelligence purposes only.
+                           </p>
+                        </div>
+                        <button
+                           onClick={() => setDisclaimerAccepted(true)}
+                           className="bg-mp-orange text-white px-8 py-3 rounded-xl font-black text-[11px] tracking-widest uppercase hover:scale-105 transition-all shadow-lg shadow-mp-orange/30"
+                        >
+                           I understand, continue
+                        </button>
+                     </div>
+                  )}
                </div>
             </div>
          )}
