@@ -28,6 +28,13 @@ def load_users():
                 "email": "jaap@mponemedia.com",
                 "hashed_password": pwd_context.hash("admin123"),
                 "disabled": False
+            },
+            "eric": {
+                "username": "eric",
+                "full_name": "Eric",
+                "email": "eric@mponemedia.com",
+                "hashed_password": pwd_context.hash("Speed123"),
+                "disabled": False
             }
         }
         with open(DB_FILE, "w") as f:

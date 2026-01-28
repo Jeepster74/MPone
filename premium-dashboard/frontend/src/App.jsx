@@ -90,17 +90,13 @@ function App() {
       setIsLoading(true);
       try {
          const headers = { 'Authorization': `Bearer ${token}` };
-
-         console.log("Starting concurrent data fetch...");
          const [tracksRes, wishRes, shapesRes] = await Promise.all([
             fetch('/api/tracks', { headers }),
             fetch('/api/wishlist', { headers }),
             fetch('/api/tracks/shapes', { headers })
          ]);
 
-         // Check for authorization errors immediately
          if (tracksRes.status === 401 || wishRes.status === 401 || shapesRes.status === 401) {
-            console.warn("Session expired or invalid. Redirecting to login...");
             handleLogout();
             return;
          }
@@ -111,110 +107,107 @@ function App() {
             shapesRes.json()
          ]);
 
-         // Safety Check: Ensure we have an array for tracks
          if (!Array.isArray(tracksData)) {
-            console.error("Received non-array tracks data:", tracksData);
             setTracks([]);
             return;
          }
 
-         console.log(`Loaded ${tracksData.length} tracks and ${shapesData.features?.length || 0} Shapes.`);
-
+         console.log(`FETCH: Loaded ${tracksData.length} tracks.`);
          setTracks(tracksData);
          setWishlist(Array.isArray(wishData) ? wishData : []);
          setShapes(shapesData);
 
-         // Determine max ranges for filters
          setMaxLength(Math.max(...tracksData.map(t => t.consolidated_track_length || 0), 1000));
          setMaxReach(Math.max(...tracksData.map(t => t.catchment_area_size || 0), 500));
 
-         // Initial markers
          const filtered = tracksData.filter(t => {
             const matchesType = (activeFilters.indoor && t.is_indoor) ||
                (activeFilters.outdoor && t.is_outdoor) ||
                (activeFilters.sim && t.is_sim);
-
             const searchLower = filters.search.toLowerCase();
             const matchesSearch = !filters.search ||
                t.Name?.toLowerCase().includes(searchLower) ||
                t.City?.toLowerCase().includes(searchLower);
-
-            const matchesMetrics =
-               (t.disposable_income_pps >= filters.minPPS) &&
+            const matchesMetrics = (t.disposable_income_pps >= filters.minPPS) &&
                (t.consolidated_track_length >= filters.minLength) &&
                (t.catchment_area_size >= filters.minReach);
-
             return matchesType && matchesSearch && matchesMetrics;
          });
+
+         console.log(`FETCH: ${filtered.length} tracks matched filters. Adding markers...`);
          addMarkers(filtered);
       } catch (err) {
-         console.error("Failed to load data", err);
+         console.error("fetchData error:", err);
       } finally {
-         // Artificial delay for that premium feel
          setTimeout(() => setIsLoading(false), 1500);
       }
    };
 
-   // Update markers when filters change
    useEffect(() => {
       if (tracks.length > 0) {
          const filtered = tracks.filter(t => {
             const matchesType = (activeFilters.indoor && t.is_indoor) ||
                (activeFilters.outdoor && t.is_outdoor) ||
                (activeFilters.sim && t.is_sim);
-
             const searchLower = filters.search.toLowerCase();
             const matchesSearch = !filters.search ||
                (t.Name && t.Name.toLowerCase().includes(searchLower)) ||
                (t.City && t.City.toLowerCase().includes(searchLower));
-
-            const matchesMetrics =
-               (t.disposable_income_pps >= filters.minPPS) &&
+            const matchesMetrics = (t.disposable_income_pps >= filters.minPPS) &&
                (t.consolidated_track_length >= filters.minLength) &&
                (t.catchment_area_size >= filters.minReach);
-
             return matchesType && matchesSearch && matchesMetrics;
          });
+         console.log(`FILTER EFFECT: ${filtered.length} tracks matched. Refreshing markers...`);
          addMarkers(filtered);
       }
    }, [activeFilters, filters, tracks]);
 
    const addMarkers = (data) => {
-      // Clear old markers
+      if (!map.current) {
+         console.warn("addMarkers called but map.current is null");
+         return;
+      }
+
       markers.current.forEach(m => m.remove());
       markers.current = [];
 
+      let addedCount = 0;
       data.forEach(track => {
          if (!track.Latitude || !track.Longitude) return;
 
          const isMultiTrack = track.is_indoor && track.is_outdoor;
          const isTrackSim = (track.is_indoor || track.is_outdoor) && track.is_sim;
 
-         let color = '#A78BFA'; // Default SIM Purple
-         if (isMultiTrack) color = '#FF6600'; // Orange
-         else if (isTrackSim) color = '#EC4899'; // Pink
-         else if (track.is_indoor) color = '#00A3FF'; // Blue
-         else if (track.is_outdoor) color = '#4ADE80'; // Green
+         let color = '#A78BFA';
+         if (isMultiTrack) color = '#FF6600';
+         else if (isTrackSim) color = '#EC4899';
+         else if (track.is_indoor) color = '#00A3FF';
+         else if (track.is_outdoor) color = '#4ADE80';
 
-         const marker = L.circleMarker([track.Latitude, track.Longitude], {
-            radius: 5, // Slightly larger
-            fillColor: color,
-            color: '#fff',
-            weight: 1.5,
-            opacity: 0.9,
-            fillOpacity: 0.7
-         })
-            .addTo(map.current)
-            .on('click', (e) => {
-               console.log("Marker clicked:", track.Name, track.track_id);
-               setSelectedTrack(track);
-               // Immediate focus
-               map.current.flyTo([track.Latitude, track.Longitude], 13, { duration: 1.5 });
-               L.DomEvent.stopPropagation(e);
-            });
+         try {
+            const marker = L.circleMarker([track.Latitude, track.Longitude], {
+               radius: 6,
+               fillColor: color,
+               color: '#fff',
+               weight: 2,
+               opacity: 1,
+               fillOpacity: 0.8
+            })
+               .addTo(map.current)
+               .on('click', (e) => {
+                  setSelectedTrack(track);
+                  map.current.flyTo([track.Latitude, track.Longitude], 13, { duration: 1.5 });
+                  L.DomEvent.stopPropagation(e);
+               });
 
-         markers.current.push(marker);
+            markers.current.push(marker);
+            addedCount++;
+         } catch (e) {
+            console.error("Error creating marker for track:", track.Name, e);
+         }
       });
+      console.log(`addMarkers: Successfully placed ${addedCount} markers.`);
    };
 
    // Update Isochrone Layer on Selection
@@ -518,7 +511,16 @@ function App() {
                            </p>
                         </div>
                         <button
-                           onClick={() => setDisclaimerAccepted(true)}
+                           onClick={() => {
+                              setDisclaimerAccepted(true);
+                              // Critical: Leaflet needs to recalculate bounds after overlay removal
+                              setTimeout(() => {
+                                 if (map.current) {
+                                    map.current.invalidateSize();
+                                    console.log("Map size invalidated.");
+                                 }
+                              }, 100);
+                           }}
                            className="bg-mp-orange text-white px-8 py-3 rounded-xl font-black text-[11px] tracking-widest uppercase hover:scale-105 transition-all shadow-lg shadow-mp-orange/30"
                         >
                            I understand, continue
