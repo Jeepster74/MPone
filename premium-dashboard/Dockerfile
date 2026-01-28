@@ -22,5 +22,6 @@ COPY backend/ ./backend
 COPY --from=frontend-build /app/frontend/dist ./static
 
 # Expose port (Cloud Run uses 8080 by default, but we'll use $PORT)
+ENV PORT=8080
 EXPOSE 8080
-CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8080}
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}
