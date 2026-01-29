@@ -106,41 +106,42 @@ def get_tracks_data():
         return []
 
 _cached_geojson = None
+_cached_geojson_str = None
 _geojson_mtime = 0
 
-def get_geojson_data():
+def get_geojson_data(as_string: bool = False):
     """
-    Reads the shapes file and caches it. 
-    Invalidates cache if the file on disk has been updated (mtime check).
+    Reads the shapes file and caches it both as dict and string.
     """
-    global _cached_geojson, _geojson_mtime
+    global _cached_geojson, _cached_geojson_str, _geojson_mtime
     
     try:
         if not os.path.exists(GEOJSON_PATH):
             print(f"WARNING: GeoJSON not found at {GEOJSON_PATH}")
-            return {"type": "FeatureCollection", "features": []}
+            return "" if as_string else {"type": "FeatureCollection", "features": []}
             
         current_mtime = os.path.getmtime(GEOJSON_PATH)
         
         # Return cache only if file hasn't changed
         if _cached_geojson is not None and current_mtime <= _geojson_mtime:
-            return _cached_geojson
+            return _cached_geojson_str if as_string else _cached_geojson
             
         print(f"LOADING GEOJSON: Loading {os.path.getsize(GEOJSON_PATH)/1024/1024:.2f} MB shapes file...")
         with open(GEOJSON_PATH, 'r') as f:
             _cached_geojson = json.load(f)
+            _cached_geojson_str = json.dumps(_cached_geojson) # Cache as string too
             _geojson_mtime = current_mtime
             print(f"SUCCESS: GeoJSON loaded cached ({len(_cached_geojson.get('features', []))} features)")
-            return _cached_geojson
+            return _cached_geojson_str if as_string else _cached_geojson
             
     except MemoryError:
         print("CRITICAL: Out of memory while loading GeoJSON!")
-        return {"type": "FeatureCollection", "features": []}
+        return "" if as_string else {"type": "FeatureCollection", "features": []}
     except Exception as e:
         print(f"Error reading GeoJSON: {e}")
         import traceback
         traceback.print_exc()
-        return {"type": "FeatureCollection", "features": []}
+        return "" if as_string else {"type": "FeatureCollection", "features": []}
 
 def load_wishlist(username: str):
     if not os.path.exists(WISHLIST_PATH):

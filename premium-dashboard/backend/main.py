@@ -52,7 +52,9 @@ async def read_tracks(current_user: User = Depends(get_current_user)):
 
 @app.get("/api/tracks/shapes")
 async def read_shapes(current_user: User = Depends(get_current_user)):
-    return get_geojson_data()
+    from fastapi.responses import Response
+    content = get_geojson_data(as_string=True)
+    return Response(content=content, media_type="application/json")
 
 @app.get("/api/wishlist")
 async def get_wishlist(current_user: User = Depends(get_current_user)):
