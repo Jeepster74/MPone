@@ -100,7 +100,9 @@ def get_tracks_data():
             
         return clean_data
     except Exception as e:
-        print(f"Error reading CSV: {e}")
+        import traceback
+        print(f"ERROR: Failed to load tracks CSV: {e}")
+        traceback.print_exc()
         return []
 
 _cached_geojson = None
@@ -115,6 +117,7 @@ def get_geojson_data():
     
     try:
         if not os.path.exists(GEOJSON_PATH):
+            print(f"WARNING: GeoJSON not found at {GEOJSON_PATH}")
             return {"type": "FeatureCollection", "features": []}
             
         current_mtime = os.path.getmtime(GEOJSON_PATH)
@@ -123,14 +126,20 @@ def get_geojson_data():
         if _cached_geojson is not None and current_mtime <= _geojson_mtime:
             return _cached_geojson
             
-        print(f"REFRESHING CACHE: GeoJSON has changed (mtime: {current_mtime})")
+        print(f"LOADING GEOJSON: Loading {os.path.getsize(GEOJSON_PATH)/1024/1024:.2f} MB shapes file...")
         with open(GEOJSON_PATH, 'r') as f:
             _cached_geojson = json.load(f)
             _geojson_mtime = current_mtime
+            print(f"SUCCESS: GeoJSON loaded cached ({len(_cached_geojson.get('features', []))} features)")
             return _cached_geojson
             
+    except MemoryError:
+        print("CRITICAL: Out of memory while loading GeoJSON!")
+        return {"type": "FeatureCollection", "features": []}
     except Exception as e:
         print(f"Error reading GeoJSON: {e}")
+        import traceback
+        traceback.print_exc()
         return {"type": "FeatureCollection", "features": []}
 
 def load_wishlist(username: str):

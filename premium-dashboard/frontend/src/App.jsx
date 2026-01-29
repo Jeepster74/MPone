@@ -101,6 +101,15 @@ function App() {
             return;
          }
 
+         if (!tracksRes.ok || !wishRes.ok || !shapesRes.ok) {
+            console.error("API Error:", {
+               tracks: tracksRes.status,
+               wishlist: wishRes.status,
+               shapes: shapesRes.status
+            });
+            throw new Error(`Server returned error: ${tracksRes.status}`);
+         }
+
          const [tracksData, wishData, shapesData] = await Promise.all([
             tracksRes.json(),
             wishRes.json(),
