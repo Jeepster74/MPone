@@ -90,63 +90,70 @@ function App() {
       setIsLoading(true);
       try {
          const headers = { 'Authorization': `Bearer ${token}` };
-         const [tracksRes, wishRes, shapesRes] = await Promise.all([
-            fetch('/api/tracks', { headers }),
-            fetch('/api/wishlist', { headers }),
-            fetch('/api/tracks/shapes', { headers })
-         ]);
 
-         if (tracksRes.status === 401 || wishRes.status === 401 || shapesRes.status === 401) {
-            handleLogout();
-            return;
+         // 1. Fetch Tracks (Critical)
+         let tracksData = [];
+         try {
+            const tracksRes = await fetch('/api/tracks', { headers });
+            if (tracksRes.status === 401) { handleLogout(); return; }
+            if (tracksRes.ok) {
+               tracksData = await tracksRes.json();
+               console.log(`FETCH: Loaded ${tracksData.length} tracks.`);
+            } else {
+               console.error("Failed to load tracks:", tracksRes.status);
+            }
+         } catch (e) {
+            console.error("Error fetching tracks:", e);
          }
 
-         if (!tracksRes.ok || !wishRes.ok || !shapesRes.ok) {
-            console.error("API Error:", {
-               tracks: tracksRes.status,
-               wishlist: wishRes.status,
-               shapes: shapesRes.status
-            });
-            throw new Error(`Server returned error: ${tracksRes.status}`);
+         // 2. Fetch Wishlist (Non-critical)
+         let wishData = [];
+         try {
+            const wishRes = await fetch('/api/wishlist', { headers });
+            if (wishRes.ok) wishData = await wishRes.json();
+         } catch (e) {
+            console.warn("Could not load wishlist:", e);
          }
 
-         const [tracksData, wishData, shapesData] = await Promise.all([
-            tracksRes.json(),
-            wishRes.json(),
-            shapesRes.json()
-         ]);
+         // 3. Fetch Shapes (Non-critical)
+         let shapesData = { type: "FeatureCollection", features: [] };
+         try {
+            const shapesRes = await fetch('/api/tracks/shapes', { headers });
+            if (shapesRes.ok) shapesData = await shapesRes.json();
+         } catch (e) {
+            console.warn("Could not load shapes:", e);
+         }
 
-         if (!Array.isArray(tracksData)) {
+         if (!Array.isArray(tracksData) || tracksData.length === 0) {
+            console.warn("No tracks available to show.");
             setTracks([]);
-            return;
+         } else {
+            setTracks(tracksData);
+            setWishlist(Array.isArray(wishData) ? wishData : []);
+            setShapes(shapesData);
+
+            setMaxLength(Math.max(...tracksData.map(t => t.consolidated_track_length || 0), 1000));
+            setMaxReach(Math.max(...tracksData.map(t => t.catchment_area_size || 0), 500));
+
+            const filtered = tracksData.filter(t => {
+               const matchesType = (activeFilters.indoor && t.is_indoor) ||
+                  (activeFilters.outdoor && t.is_outdoor) ||
+                  (activeFilters.sim && t.is_sim);
+               const searchLower = filters.search.toLowerCase();
+               const matchesSearch = !filters.search ||
+                  t.Name?.toLowerCase().includes(searchLower) ||
+                  t.City?.toLowerCase().includes(searchLower);
+               const matchesMetrics = (t.disposable_income_pps >= filters.minPPS) &&
+                  (t.consolidated_track_length >= filters.minLength) &&
+                  (t.catchment_area_size >= filters.minReach);
+               return matchesType && matchesSearch && matchesMetrics;
+            });
+
+            console.log(`FETCH: ${filtered.length} tracks matched filters. Adding markers...`);
+            addMarkers(filtered);
          }
-
-         console.log(`FETCH: Loaded ${tracksData.length} tracks.`);
-         setTracks(tracksData);
-         setWishlist(Array.isArray(wishData) ? wishData : []);
-         setShapes(shapesData);
-
-         setMaxLength(Math.max(...tracksData.map(t => t.consolidated_track_length || 0), 1000));
-         setMaxReach(Math.max(...tracksData.map(t => t.catchment_area_size || 0), 500));
-
-         const filtered = tracksData.filter(t => {
-            const matchesType = (activeFilters.indoor && t.is_indoor) ||
-               (activeFilters.outdoor && t.is_outdoor) ||
-               (activeFilters.sim && t.is_sim);
-            const searchLower = filters.search.toLowerCase();
-            const matchesSearch = !filters.search ||
-               t.Name?.toLowerCase().includes(searchLower) ||
-               t.City?.toLowerCase().includes(searchLower);
-            const matchesMetrics = (t.disposable_income_pps >= filters.minPPS) &&
-               (t.consolidated_track_length >= filters.minLength) &&
-               (t.catchment_area_size >= filters.minReach);
-            return matchesType && matchesSearch && matchesMetrics;
-         });
-
-         console.log(`FETCH: ${filtered.length} tracks matched filters. Adding markers...`);
-         addMarkers(filtered);
       } catch (err) {
-         console.error("fetchData error:", err);
+         console.error("fetchData overall error:", err);
       } finally {
          setTimeout(() => setIsLoading(false), 1500);
       }
