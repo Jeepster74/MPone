@@ -248,11 +248,11 @@ function App() {
             isochroneLayer.current = L.geoJSON(feature, {
                className: 'leaflet-isochrone-pulse',
                style: {
-                  color: MP_ORANGE,
-                  weight: 3,
+                  color: '#FF6600', // Solid orange
+                  weight: 4,
                   dashArray: '5, 10',
-                  fillColor: MP_ORANGE,
-                  fillOpacity: 0.25,
+                  fillColor: '#FF6600',
+                  fillOpacity: 0.4,
                   interactive: false
                }
             }).addTo(map.current);
