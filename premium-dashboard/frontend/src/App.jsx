@@ -48,6 +48,12 @@ function App() {
             }).addTo(map.current);
 
             L.control.attribution({ position: 'bottomleft' }).addTo(map.current);
+
+            // Clear selection when clicking empty map
+            map.current.on('click', () => {
+               console.log("Map background clicked. Clearing selection.");
+               setSelectedTrack(null);
+            });
          }
          fetchData();
       }
@@ -248,9 +254,8 @@ function App() {
             isochroneLayer.current = L.geoJSON(feature, {
                className: 'leaflet-isochrone-pulse',
                style: {
-                  color: '#FF6600', // Solid orange
-                  weight: 4,
-                  dashArray: '5, 10',
+                  color: '#FF6600',
+                  weight: 5,
                   fillColor: '#FF6600',
                   fillOpacity: 0.4,
                   interactive: false
