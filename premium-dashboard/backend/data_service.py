@@ -88,13 +88,54 @@ def get_tracks_data():
             # Mapping CSV names to what Frontend expects
             key_map = {
                 'Review Velocity (12m)': 'Review Velocity',
-                'Owner Activity': 'Owner Responds'
+                'Owner Activity': 'Owner Responds',
+                'Average Rating': 'average_rating'
             }
             
+            # Sentiment and Investment fields to ensure are present and sanitized
+            insight_fields = [
+                'rough_diamond_score', 'dominant_sentiment', 'problem_type_summary', 
+                'investment_risk_summary', 'sentiment_detail_text',
+                'sentiment_capex_score', 'sentiment_opex_score', 'sentiment_vibe_score',
+                'ai_insights', 'ai_sentiment', 'ai_confidence', 'review_count_12m'
+            ]
+            
             sanitized_record = {}
+            # Process mapped keys
             for k, v in record.items():
                 target_k = key_map.get(k, k)
                 sanitized_record[target_k] = sanitize(v, target_k)
+            
+            # Ensure insights exist (even if None) and are sanitized
+            for field in insight_fields:
+                val = record.get(field)
+                if field.endswith('_score') and isinstance(val, (int, float)):
+                    # Ensure numerical precision for frontend gauges
+                    sanitized_record[field] = round(float(val), 2)
+                elif isinstance(val, str):
+                    # Clean up any lingering JSON artifacts or newlines
+                    sanitized_record[field] = val.replace('\n', ' ').strip().replace('  ', ' ')
+                else:
+                    sanitized_record[field] = sanitize(val, field)
+
+            # --- NEW: Computed Metrics for Factual UX ---
+            # Asset Quality: Inverse of CAPEX issues. 0% = Total Ruin, 100% = Pristine.
+            # sentiment_capex_score is 0.0 to 1.0 (where 1.0 is bad)
+            capex = sanitized_record.get('sentiment_capex_score', 0)
+            if isinstance(capex, (int, float)):
+                sanitized_record['asset_quality_score'] = round(max(0, 100 - (capex * 100)), 1)
+            else:
+                sanitized_record['asset_quality_score'] = 100 # Default to good if unknown
+
+            # Ensure spending power is a clean number
+            pps = record.get('disposable_income_pps')
+            if isinstance(pps, (int, float)):
+                sanitized_record['spending_power_pps'] = pps
+            else:
+                try:
+                    sanitized_record['spending_power_pps'] = float(pps)
+                except:
+                    sanitized_record['spending_power_pps'] = 0
             
             clean_data.append(sanitized_record)
             

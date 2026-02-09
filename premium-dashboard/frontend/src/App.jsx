@@ -22,7 +22,11 @@ function App() {
       search: '',
       minPPS: 0,
       minLength: 0,
-      minReach: 0
+      minReach: 0,
+
+      minAssetQuality: 0,  // NEW Filter
+      requireCapex: false,
+      requireOpex: false
    });
    const [isLoading, setIsLoading] = useState(true);
    const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
@@ -152,7 +156,13 @@ function App() {
                const matchesMetrics = (t.disposable_income_pps >= filters.minPPS) &&
                   (t.consolidated_track_length >= filters.minLength) &&
                   (t.catchment_area_size >= filters.minReach);
-               return matchesType && matchesSearch && matchesMetrics;
+
+               const matchesAssetQuality = !filters.minAssetQuality || (t.asset_quality_score && t.asset_quality_score >= filters.minAssetQuality);
+
+               const matchesCapex = !filters.requireCapex || (t.sentiment_capex_score > 0.3);
+               const matchesOpex = !filters.requireOpex || (t.sentiment_opex_score > 0.3);
+
+               return matchesType && matchesSearch && matchesMetrics && matchesAssetQuality && matchesCapex && matchesOpex;
             });
 
             console.log(`FETCH: ${filtered.length} tracks matched filters. Adding markers...`);
@@ -178,7 +188,13 @@ function App() {
             const matchesMetrics = (t.disposable_income_pps >= filters.minPPS) &&
                (t.consolidated_track_length >= filters.minLength) &&
                (t.catchment_area_size >= filters.minReach);
-            return matchesType && matchesSearch && matchesMetrics;
+
+            const matchesAssetQuality = !filters.minAssetQuality || (t.asset_quality_score && t.asset_quality_score >= filters.minAssetQuality);
+
+            const matchesCapex = !filters.requireCapex || (t.sentiment_capex_score > 0.3);
+            const matchesOpex = !filters.requireOpex || (t.sentiment_opex_score > 0.3);
+
+            return matchesType && matchesSearch && matchesMetrics && matchesAssetQuality && matchesCapex && matchesOpex;
          });
          console.log(`FILTER EFFECT: ${filtered.length} tracks matched. Refreshing markers...`);
          addMarkers(filtered);
@@ -300,22 +316,55 @@ function App() {
          meaning: "The total geographical surface area reachable within a 30-minute drive-time in square kilometers (km²).",
          importance: "Reflects the geographic accessibility and the spatial footprint of the immediate local market available to the facility.",
          source: "OpenRouteService Matrix API"
-      }
+      },
+      strategicInsights: {
+         meaning: "AI-powered analysis of customer reviews using the Gemini API to extract investment-relevant signals.",
+         importance: "Identifies asset condition issues, operational strengths/weaknesses, and market positioning to inform acquisition decisions.",
+         source: "Google Gemini AI Analysis"
+      },
    };
 
-   const InfoTooltip = ({ info, position = "left" }) => (
-      <div className="tooltip-trigger ml-1 text-slate-500 hover:text-mp-orange transition-colors z-[5500]">
+   const InfoTooltip = ({ info, position = 'right' }) => (
+      <div
+         className="ml-1 text-slate-500 hover:text-mp-orange transition-colors cursor-help"
+         onMouseEnter={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const tooltipWidth = 256; // w-64 = 16rem = 256px
+            setActiveTooltip({
+               info,
+               x: position === 'left' ? rect.left - tooltipWidth - 10 : rect.right + 10,
+               y: rect.top,
+               position
+            });
+         }}
+         onMouseLeave={() => setActiveTooltip(null)}
+      >
          <span className="text-[10px] font-bold border border-slate-500 rounded-full w-3 h-3 flex items-center justify-center">i</span>
-         <div className={`tooltip-content ${position === 'right' ? 'right-full mr-2' : 'left-full ml-2'} top-0 shadow-2xl z-[6000]`}>
-            <div className="tooltip-section-title">What it means</div>
-            <div className="tooltip-text">{info.meaning}</div>
-            <div className="tooltip-section-title">Investment Rationale</div>
-            <div className="tooltip-text">{info.importance}</div>
-            <div className="tooltip-section-title">Data Source</div>
-            <div className="tooltip-text italic text-slate-400">{info.source}</div>
-         </div>
       </div>
    );
+
+   const GlobalTooltip = () => {
+      if (!activeTooltip) return null;
+      return (
+         <div
+            className="fixed z-[9999] w-64 bg-slate-900/95 backdrop-blur-xl border border-white/20 p-4 rounded-xl shadow-2xl pointer-events-none animate-in fade-in zoom-in-95 duration-200"
+            style={{ top: activeTooltip.y, left: activeTooltip.x }}
+         >
+            <div className="text-[10px] font-bold text-mp-orange uppercase tracking-widest mb-2">What it means</div>
+            <div className="text-xs text-slate-300 leading-relaxed mb-3">{activeTooltip.info.meaning}</div>
+
+            <div className="text-[10px] font-bold text-mp-orange uppercase tracking-widest mb-2">Investment Context</div>
+            <div className="text-xs text-slate-300 leading-relaxed mb-3">{activeTooltip.info.importance}</div>
+
+            <div className="pt-2 border-t border-white/10 flex justify-between items-center">
+               <span className="text-[9px] text-slate-500 uppercase tracking-widest">Source</span>
+               <span className="text-[9px] text-slate-400 italic">{activeTooltip.info.source}</span>
+            </div>
+         </div>
+      );
+   };
+
+
 
    const SliderFilter = ({ label, lowLabel, highLabel, value, max, onChange, unit = "", info }) => (
       <div className="space-y-2 pt-2">
@@ -409,52 +458,53 @@ function App() {
    };
 
    // 1. DATA GLOSSARY
-   const GLOSSARY = {
-      'disposable_income_pps': {
-         label: 'Regional Wealth Index',
-         desc: 'Net disposable income per inhabitant in Purchasing Power Standard (PPS). Reflects consumer spending power.',
-         source: 'Eurostat 2023'
-      },
-      'catchment_area_size': {
-         label: 'Catchment Area (30-Min)',
-         desc: 'The geographical area (km²) reachable within 30 minutes by car. Larger areas indicate better road connectivity and potential spatial reach.',
-         source: 'OpenRouteService API'
-      },
-      'building_sqm': {
-         label: 'Facility Footprint',
-         desc: 'The physical size of the building polygon measured in square meters. Used to verify indoor scale.',
-         source: 'OpenStreetMap Polygons'
-      },
-      'Review Velocity': {
-         label: 'Review Momentum',
-         desc: 'Number of Google Reviews posted in the last 12 months. Indicates current popularity and user engagement velocity.',
-         source: 'Google Maps Extraction'
-      },
-      'consolidated_track_length': {
-         label: 'Track Length',
-         desc: 'Total length of the racing circuit in meters. Verified via website scraping or OSM geometry.',
-         source: 'Official Website / OSM'
-      },
-      'Management Issues': {
-         label: 'Service Sentiment',
-         desc: 'AI detection of negative feedback regarding staff, service, or hospitality. Lower is better.',
-         source: 'NLP Sentiment Analysis'
-      },
-      'Structural Issues': {
-         label: 'Asset Sentiment',
-         desc: 'AI detection of negative feedback regarding track layout, kart quality, or facilities. Indicates CAPEX needs.',
-         source: 'NLP Sentiment Analysis'
-      },
-      'Owner Responds': {
-         label: 'Operational Proactivity',
-         desc: 'Verification of whether facility owners actively engage with and respond to digital feedback.',
-         source: 'Google Maps Audit'
-      },
-      'data_quality_score': {
-         label: 'Data Quality Index',
-         desc: 'Composite score (0-100%) indicating the completeness and reliability of the data for this location. High scores represent verified records with images, sentiment, and catchment data.',
-         source: 'MP Analytics Engine'
+
+
+   const getInvestmentHypothesis = (track) => {
+      const capex = track.sentiment_capex_score || 0;
+      const opex = track.sentiment_opex_score || 0;
+      const wealth = track.disposable_income_pps || 0;
+      const quality = track.asset_quality_score || 0;
+
+      let level = (wealth > 30000 && quality < 50) ? "HIGH CONVICTION" : "STRATEGIC POTENTIAL";
+      let focus = "";
+      let verdict = "";
+
+      if (capex > 0.4) {
+         focus = "Structural asset decay detected. Primary value unlock through CAPEX-led facility modernization.";
+         verdict = `ACQUIRE FOR LOCATION. DEMOLISH FLEET. PIVOT TO CORPORATE HOSPITALITY. (High Failure Risk: ${Math.round(capex * 100)}%)`;
+      } else if (opex > 0.4) {
+         focus = "Operational inefficiency identified. Strategic management pivot required to capture premium market share.";
+         verdict = "MANAGEMENT OVERHAUL REQUIRED. IMPLEMENT DYNAMIC PRICING. (Ops Efficiency: LOW)";
+      } else if (wealth > 32000) {
+         focus = "Market Arbitrage: High-wealth demographics served by stagnation. Potential for high-yield luxury karting pivot.";
+         verdict = "PRIME ARBITRAGE OPPORTUNITY. RAISE TICKET PRICES 25%. TARGET LUXURY SEGMENT.";
+      } else {
+         focus = "Yield Optimization: Strong market fundamentals with minor friction. Ideal for rapid operational turnaround.";
+         verdict = "STABLE CASH FLOW. OPTIMIZE UTILIZATION RATES. (Low Risk Entry)";
       }
+
+      return { level, focus, verdict };
+   };
+
+   // Calculate effective confidence based on review count + AI assessment
+   const getEffectiveConfidence = (track) => {
+      const reviewCount = parseInt(track.review_count_12m) || parseInt(track['Review Velocity (12m)']) || 0;
+      const aiConfidence = track.ai_confidence || 'low';
+
+      // Insufficient data threshold (0-1 reviews)
+      if (reviewCount <= 1) return 'insufficient';
+
+      // Low sample size (2-4 reviews) always caps at low
+      if (reviewCount <= 4) return 'low';
+
+      // Medium sample (5-7): cap at medium
+      if (reviewCount <= 7) {
+         return aiConfidence === 'high' ? 'medium' : aiConfidence;
+      }
+
+      // High sample (8+): trust AI confidence
+      return aiConfidence;
    };
 
    if (!isAuthenticated) {
@@ -585,128 +635,120 @@ function App() {
             <div ref={mapContainer} className="absolute inset-0 z-0 bg-slate-900" />
 
             {/* LEFT SIDEBAR: FILTERS */}
-            <aside className="absolute top-6 left-6 w-72 z-[4000] space-y-4">
-               <div className="bg-glass border-premium p-5 rounded-2xl shadow-2xl space-y-6">
-                  <div>
-                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-mp-orange mb-4">MP ONE Intelligence</h3>
-                     <div className="relative">
-                        <input
-                           type="text"
-                           placeholder="Search Tracks or Cities..."
-                           className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-mp-orange/50 transition-all font-medium"
-                           value={filters.search}
-                           onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                        />
-                        <span className="absolute right-4 top-3.5 text-slate-600">🔍</span>
-                     </div>
-                  </div>
-
-                  <div className="space-y-5">
-                     <div className="pt-2">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">Facility Matrix</label>
-                        <div className="grid grid-cols-2 gap-2 text-[10px]">
-                           {[
-                              { label: 'Indoor', key: 'indoor', color: '#00A3FF' },
-                              { label: 'Outdoor', key: 'outdoor', color: '#4ADE80' },
-                              { label: 'SIM', key: 'sim', color: '#A78BFA' }
-                           ].map(type => (
-                              <button
-                                 key={type.key}
-                                 onClick={() => setActiveFilters({ ...activeFilters, [type.key]: !activeFilters[type.key] })}
-                                 className={`px-3 py-2 rounded-lg border transition-all duration-300 flex items-center space-x-2 ${activeFilters[type.key] ? 'bg-mp-orange/10 border-mp-orange/30 text-white shadow-lg shadow-mp-orange/5' : 'border-white/5 bg-white/2 bg-transparent text-slate-500 hover:bg-white/5'}`}
-                              >
-                                 <div className={`w-1.5 h-1.5 rounded-full`} style={{ backgroundColor: type.color }} />
-                                 <span className="font-bold uppercase tracking-tight">{type.label}</span>
-                              </button>
-                           ))}
+            <aside className="absolute top-6 left-6 w-72 z-[4000] max-h-[calc(100vh-3rem)] flex flex-col pointer-events-none">
+               <div className="overflow-y-auto scrollbar-hide space-y-4 pointer-events-auto pb-4">
+                  <div className="bg-glass border-premium p-5 rounded-2xl shadow-2xl space-y-6">
+                     <div>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-mp-orange mb-4">MP ONE Intelligence</h3>
+                        <div className="relative">
+                           <input
+                              type="text"
+                              placeholder="Search Tracks or Cities..."
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-mp-orange/50 transition-all font-medium"
+                              value={filters.search}
+                              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                           />
+                           <span className="absolute right-4 top-3.5 text-slate-600">🔍</span>
                         </div>
                      </div>
 
-                     <SliderFilter
-                        label="Wealth Index"
-                        lowLabel="Low Wealth"
-                        highLabel="High Wealth"
-                        value={filters.minPPS}
-                        max={40000}
-                        unit=" PPS"
-                        onChange={(v) => setFilters({ ...filters, minPPS: v })}
-                        info={METRIC_INFO.wealth}
-                     />
+                     <div className="space-y-5">
+                        <div className="pt-2">
+                           <label className="text-[10px] font-black italic text-slate-400 uppercase tracking-widest block mb-4 border-b border-white/5 pb-2">Facility Profile</label>
+                           <div className="grid grid-cols-3 gap-2 text-[10px]">
+                              {[
+                                 { label: 'Indoor', key: 'indoor', color: '#00A3FF' },
+                                 { label: 'Outdoor', key: 'outdoor', color: '#4ADE80' },
+                                 { label: 'SIM', key: 'sim', color: '#A78BFA' }
+                              ].map(type => (
+                                 <button
+                                    key={type.key}
+                                    onClick={() => setActiveFilters({ ...activeFilters, [type.key]: !activeFilters[type.key] })}
+                                    className={`px-2 py-2 rounded-lg border transition-all duration-300 flex flex-col items-center justify-center space-y-1 ${activeFilters[type.key] ? 'bg-mp-orange/10 border-mp-orange/30 text-white shadow-lg shadow-mp-orange/5' : 'border-white/5 bg-transparent text-slate-600 hover:bg-white/5'}`}
+                                 >
+                                    <div className={`w-1.5 h-1.5 rounded-full`} style={{ backgroundColor: type.color }} />
+                                    <span className="font-bold uppercase tracking-tighter">{type.label}</span>
+                                 </button>
+                              ))}
+                           </div>
+                        </div>
 
-                     <SliderFilter
-                        label="Track Length"
-                        lowLabel="Short"
-                        highLabel="Pro-Circuit"
-                        value={filters.minLength}
-                        max={maxLength}
-                        unit="m"
-                        onChange={(v) => setFilters({ ...filters, minLength: v })}
-                        info={METRIC_INFO.length}
-                     />
+                        <div className="space-y-4 pt-2">
+                           <label className="text-[10px] font-black italic text-slate-400 uppercase tracking-widest block border-b border-white/5 pb-2">Market Potential</label>
+                           <SliderFilter
+                              label="Wealth Index"
+                              lowLabel="Low"
+                              highLabel="High"
+                              value={filters.minPPS}
+                              max={40000}
+                              unit=" PPS"
+                              onChange={(v) => setFilters({ ...filters, minPPS: v })}
+                              info={METRIC_INFO.wealth}
+                           />
 
-                     <SliderFilter
-                        label="Catchment Area"
-                        lowLabel="Low Reach"
-                        highLabel="High Reach"
-                        value={filters.minReach}
-                        max={maxReach}
-                        unit=" km²"
-                        onChange={(v) => setFilters({ ...filters, minReach: v })}
-                        info={METRIC_INFO.reach}
-                     />
-                  </div>
-               </div>
+                           <SliderFilter
+                              label="Track Length"
+                              lowLabel="Short"
+                              highLabel="Pro"
+                              value={filters.minLength}
+                              max={maxLength}
+                              unit="m"
+                              onChange={(v) => setFilters({ ...filters, minLength: v })}
+                              info={METRIC_INFO.length}
+                           />
 
-               <div className="bg-glass backdrop-blur-xl p-5 rounded-xl border border-white/10 shadow-2xl">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Map Legend</h3>
-                  <div className="space-y-2">
-                     <div className="flex items-center space-x-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#FF6600]"></div>
-                        <span className="text-[10px] text-slate-300 font-medium">Multi-Track (Indoor + Outdoor)</span>
-                     </div>
-                     <div className="flex items-center space-x-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#EC4899]"></div>
-                        <span className="text-[10px] text-slate-300 font-medium">Track + SIM Racing</span>
-                     </div>
-                     <div className="flex items-center space-x-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#00A3FF]"></div>
-                        <span className="text-[10px] text-slate-300 font-medium">Indoor Only</span>
-                     </div>
-                     <div className="flex items-center space-x-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#4ADE80]"></div>
-                        <span className="text-[10px] text-slate-300 font-medium">Outdoor Only</span>
-                     </div>
-                     <div className="flex items-center space-x-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#A78BFA]"></div>
-                        <span className="text-[10px] text-slate-300 font-medium">SIM Racing Only</span>
-                     </div>
-                  </div>
-               </div>
+                           <SliderFilter
+                              label="Catchment Reach"
+                              lowLabel="Local"
+                              highLabel="Regional"
+                              value={filters.minReach}
+                              max={maxReach}
+                              unit=" km²"
+                              onChange={(v) => setFilters({ ...filters, minReach: v })}
+                              info={METRIC_INFO.reach}
+                           />
+                        </div>
 
-               <div className="bg-glass backdrop-blur-xl p-5 rounded-xl border border-white/10 shadow-2xl">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Data Intelligence</h3>
-                  <div className="flex items-center justify-between mb-2">
-                     <span className="text-xs">Catchment Coverage</span>
-                     <span className="text-xs text-mp-orange font-bold">
-                        {shapes ? `${Math.round((shapes.features.length / Math.max(1, tracks.length)) * 100)}%` : 'Loading...'}
-                     </span>
+
+                     </div>
                   </div>
-                  <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
-                     <div
-                        className="bg-mp-orange h-full transition-all duration-1000"
-                        style={{ width: shapes ? `${Math.min(100, Math.round((shapes.features.length / Math.max(1, tracks.length)) * 100))}%` : '0%' }}
-                     />
+
+                  <div className="bg-glass backdrop-blur-xl p-5 rounded-xl border border-white/10 shadow-2xl">
+                     <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Map Legend</h3>
+                     <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                           <div className="w-2.5 h-2.5 rounded-full bg-[#FF6600]"></div>
+                           <span className="text-[10px] text-slate-300 font-medium">Multi-Track (Indoor + Outdoor)</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                           <div className="w-2.5 h-2.5 rounded-full bg-[#EC4899]"></div>
+                           <span className="text-[10px] text-slate-300 font-medium">Track + SIM Racing</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                           <div className="w-2.5 h-2.5 rounded-full bg-[#00A3FF]"></div>
+                           <span className="text-[10px] text-slate-300 font-medium">Indoor Only</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                           <div className="w-2.5 h-2.5 rounded-full bg-[#4ADE80]"></div>
+                           <span className="text-[10px] text-slate-300 font-medium">Outdoor Only</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                           <div className="w-2.5 h-2.5 rounded-full bg-[#A78BFA]"></div>
+                           <span className="text-[10px] text-slate-300 font-medium">SIM Racing Only</span>
+                        </div>
+                     </div>
                   </div>
-                  <p className="text-[9px] text-slate-500 mt-2 uppercase tracking-tight">Geo-Spatial Analysis complete for enriched sites</p>
+
+
                </div>
             </aside>
 
             {/* RIGHT PANE: DETAIL */}
-            <div className={`absolute top-0 right-0 h-full w-[400px] z-[4000] bg-mp-black border-l border-white/10 transform transition-transform duration-500 shadow-2xl ${selectedTrack ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className={`absolute top-0 right-0 h-full w-[400px] z-[6000] bg-mp-black border-l border-white/10 transform transition-transform duration-500 shadow-2xl ${selectedTrack ? 'translate-x-0' : 'translate-x-full'}`}>
                {selectedTrack && (
                   <div className="h-full flex flex-col">
                      {/* WRAPPED HEADER */}
-                     <div className="p-8 pb-4">
+                     <div className="p-8 pb-4 shrink-0">
                         <div className="flex justify-between items-start">
                            <div className="flex-1">
                               <h2 className="text-3xl font-black leading-tight tracking-tight text-white mb-1">{selectedTrack.Name}</h2>
@@ -755,10 +797,140 @@ function App() {
                      </div>
 
                      {/* SCROLLABLE BODY */}
-                     <div className="flex-1 overflow-y-auto overflow-x-visible scrollbar-hide ml-[-300px] pl-[300px] pointer-events-none">
-                        <div className="px-8 pb-8 space-y-8 pointer-events-auto">
+                     <div className="flex-1 overflow-y-auto scrollbar-hide">
+                        <div className="px-8 pb-8 space-y-8">
                            <div className="aspect-[16/10] w-full bg-slate-900 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-                              <img src={selectedTrack["Hero Image URL"]} className="w-full h-full object-cover grayscale-[0.2]" alt="Track" />
+                              <img
+                                 src={selectedTrack["Hero Image URL"]}
+                                 className="w-full h-full object-cover grayscale-[0.2]"
+                                 alt="Track"
+                                 referrerPolicy="no-referrer"
+                              />
+                           </div>
+                           {/* MOVED: Track Length */}
+                           <div className="flex space-x-2">
+                              {selectedTrack.is_indoor && (
+                                 <div className="flex-1 bg-white/5 rounded-xl p-3 flex items-center justify-between border border-white/5">
+                                    <span className="text-[9px] font-black text-white uppercase tracking-widest pl-1">Indoor</span>
+                                    <span className="text-xs font-black text-white tracking-wide">{selectedTrack.consolidated_track_length}m</span>
+                                 </div>
+                              )}
+                              {selectedTrack.is_outdoor && (
+                                 <div className="flex-1 bg-white/5 rounded-xl p-3 flex items-center justify-between border border-white/5">
+                                    <span className="text-[9px] font-black text-white uppercase tracking-widest pl-1">Outdoor</span>
+                                    <span className="text-xs font-black text-white tracking-wide">{selectedTrack.consolidated_track_length}m</span>
+                                 </div>
+                              )}
+                           </div>
+
+                           {/* INVESTMENT PROFILE SECTION */}
+                           <div className="space-y-6 pt-3 border-t border-white/10">
+
+                              <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 space-y-5 shadow-inner">
+
+
+
+
+                                 <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                       <div className="flex items-center">
+                                          <span className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">Strategic Insight</span>
+                                          <InfoTooltip info={METRIC_INFO.strategicInsights} position="left" />
+                                       </div>
+                                       <span className="text-[10px] text-slate-400">
+                                          {selectedTrack.Average_Rating && selectedTrack.Average_Rating !== "N/A" && (
+                                             <span className="mr-2">⭐ {parseFloat(selectedTrack.Average_Rating).toFixed(1)}</span>
+                                          )}
+                                       </span>
+                                    </div>
+                                    {(selectedTrack.review_count_12m > 0 || selectedTrack['Review Velocity (12m)'] > 0) && (
+                                       <div className="text-xs text-slate-500 italic -mt-1">
+                                          Based on {selectedTrack.review_count_12m || selectedTrack['Review Velocity (12m)']} reviews
+                                       </div>
+                                    )}
+                                    <div className="bg-white/5 rounded-xl p-5 border border-white/5">
+                                       {(() => {
+                                          const getInsightIcon = (insight) => {
+                                             if (insight.startsWith('Asset:')) return 'domain';
+                                             if (insight.startsWith('Ops:')) return 'settings';
+                                             if (insight.startsWith('Market:')) return 'trending_up';
+                                             return 'circle';
+                                          };
+                                          const getIconColor = (insight) => {
+                                             if (insight.startsWith('Asset:')) return 'text-blue-400';
+                                             if (insight.startsWith('Ops:')) return 'text-amber-400';
+                                             if (insight.startsWith('Market:')) return 'text-emerald-400';
+                                             return 'text-slate-400';
+                                          };
+                                          const formatInsight = (insight) => {
+                                             // Remove the prefix like "Asset: " to show just the verdict
+                                             return insight.replace(/^(Asset|Ops|Market):\s*/, '');
+                                          };
+                                          const getInsightLabel = (insight) => {
+                                             if (insight.startsWith('Asset:')) return 'ASSET';
+                                             if (insight.startsWith('Ops:')) return 'OPERATIONS';
+                                             if (insight.startsWith('Market:')) return 'MARKET FIT';
+                                             return '';
+                                          };
+                                          try {
+                                             const insights = selectedTrack.ai_insights ? JSON.parse(selectedTrack.ai_insights) : null;
+                                             if (insights && Array.isArray(insights) && insights.length > 0) {
+                                                return (
+                                                   <>
+                                                      <div className="space-y-5">
+                                                         {insights.map((insight, i) => (
+                                                            <div key={i} className="flex items-start gap-3">
+                                                               <span className={`material-symbols-outlined text-xl flex-shrink-0 mt-0.5 ${getIconColor(insight)}`} style={{ fontVariationSettings: "'FILL' 1" }}>{getInsightIcon(insight)}</span>
+                                                               <div className="flex-1">
+                                                                  <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">{getInsightLabel(insight)}</div>
+                                                                  <p className="text-sm text-slate-200 leading-relaxed font-medium">{formatInsight(insight)}</p>
+                                                               </div>
+                                                            </div>
+                                                         ))}
+                                                      </div>
+                                                      {(() => {
+                                                         const effectiveConf = getEffectiveConfidence(selectedTrack);
+                                                         const confConfig = {
+                                                            high: { icon: 'verified', color: 'text-green-400', label: 'High Confidence' },
+                                                            medium: { icon: 'pending', color: 'text-yellow-400', label: 'Medium Confidence' },
+                                                            low: { icon: 'error', color: 'text-red-400', label: 'Low Confidence' },
+                                                            insufficient: { icon: 'help', color: 'text-slate-500', label: 'Insufficient Data' }
+                                                         };
+                                                         const conf = confConfig[effectiveConf] || confConfig.low;
+                                                         return (
+                                                            <div className="pt-4 mt-4 border-t border-white/10 flex items-center gap-2">
+                                                               <span className={`material-symbols-outlined text-sm ${conf.color}`} style={{ fontVariationSettings: "'FILL' 1" }}>{conf.icon}</span>
+                                                               <span className={`text-[10px] uppercase tracking-wider font-bold ${conf.color}`}>
+                                                                  {conf.label}
+                                                               </span>
+                                                            </div>
+                                                         );
+                                                      })()}
+                                                   </>
+                                                );
+                                             }
+                                          } catch (e) { }
+                                          // Fallback to old format
+                                          return (
+                                             <p className="text-sm leading-relaxed text-slate-300 italic font-medium">
+                                                "{selectedTrack.problem_type_summary && selectedTrack.problem_type_summary.length > 20 ? selectedTrack.problem_type_summary : selectedTrack["Top Reviews Snippet"] || "No significant structural feedback detected in current dataset."}"
+                                             </p>
+                                          );
+                                       })()}
+                                    </div>
+                                 </div>
+
+                                 {selectedTrack.sentiment_detail_text && (
+                                    <div className="pt-2">
+                                       <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-2">Key Value Drivers</div>
+                                       <div className="text-[10px] text-slate-400 leading-normal font-medium bg-white/2 p-3 rounded-lg border border-white/5">
+                                          {selectedTrack.sentiment_detail_text}
+                                       </div>
+                                    </div>
+                                 )}
+
+
+                              </div>
                            </div>
 
                            <div className="space-y-4">
@@ -782,31 +954,9 @@ function App() {
                               </div>
                            </div>
 
-                           <div className="space-y-4">
-                              <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">Track Length</h4>
-                              <div className="grid grid-cols-2 gap-3">
-                                 <MetricBox
-                                    label="Indoor"
-                                    value={selectedTrack.is_indoor ? selectedTrack.consolidated_track_length : 0}
-                                    unit="M"
-                                    progress={selectedTrack.is_indoor ? (selectedTrack.consolidated_track_length / 1000) * 100 : 0}
-                                    info={METRIC_INFO.length}
-                                 />
-                                 <MetricBox
-                                    label="Outdoor"
-                                    value={selectedTrack.is_outdoor ? selectedTrack.consolidated_track_length : 0}
-                                    unit="M"
-                                    progress={selectedTrack.is_outdoor ? (selectedTrack.consolidated_track_length / 1000) * 100 : 0}
-                                    color="bg-green-400"
-                                    info={METRIC_INFO.length}
-                                 />
-                              </div>
-                           </div>
 
-                           <div className="pt-4 border-t border-white/5 flex items-center justify-between">
-                              <div className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Data Quality Index</div>
-                              <div className="text-[10px] font-black text-mp-orange">{selectedTrack.data_quality_score}%</div>
-                           </div>
+
+
                         </div>
                      </div>
                   </div>
@@ -814,7 +964,7 @@ function App() {
             </div>
 
             {/* WISHLIST OVERLAY */}
-            <div className={`absolute top-0 right-0 h-full w-[450px] z-[4500] bg-mp-black border-l border-white/10 transform transition-transform duration-500 shadow-2xl flex flex-col ${showWishlist ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className={`absolute top-0 right-0 h-full w-[450px] z-[6001] bg-mp-black border-l border-white/10 transform transition-transform duration-500 shadow-2xl flex flex-col ${showWishlist ? 'translate-x-0' : 'translate-x-full'}`}>
                <div className="p-8 pb-4 flex justify-between items-center">
                   <div className="flex items-center space-x-3">
                      <h2 className="text-2xl font-black text-white">MY <span className="text-mp-orange">WISHLIST</span></h2>
@@ -847,7 +997,12 @@ function App() {
                            className="bg-white/5 border border-white/10 rounded-2xl p-4 flex space-x-4 cursor-pointer hover:bg-white/10 hover:border-mp-orange/30 transition-all group"
                         >
                            <div className="w-20 h-20 bg-slate-800 rounded-xl overflow-hidden flex-shrink-0">
-                              <img src={track["Hero Image URL"]} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" alt="" />
+                              <img
+                                 src={track["Hero Image URL"]}
+                                 className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
+                                 alt=""
+                                 referrerPolicy="no-referrer"
+                              />
                            </div>
                            <div className="flex-1 min-w-0">
                               <div className="flex justify-between items-start">
@@ -873,6 +1028,8 @@ function App() {
                </div>
             </div>
          </div>
+         {/* TOOLTIP OVERLAY */}
+         <GlobalTooltip />
       </div>
    );
 }
