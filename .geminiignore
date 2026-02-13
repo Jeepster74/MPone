@@ -1,0 +1,6 @@
+cache/
+debug_*.png
+*.pdf
+*.db
+premium-dashboard/static/
+Market_Analysis_Package/

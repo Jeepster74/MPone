@@ -24,6 +24,9 @@ COPY data/ ./data
 # Copy built frontend (Static files)
 COPY --from=frontend-build /app/frontend/dist ./static
 
+# Copy PDF report to static for download
+COPY data/report.pdf ./static/
+
 # Expose port (Cloud Run uses 8080 by default, but we'll use $PORT)
 ENV PORT=8080
 EXPOSE 8080
