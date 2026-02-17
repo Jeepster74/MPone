@@ -235,7 +235,7 @@ function App() {
                .addTo(map.current)
                .on('click', (e) => {
                   setSelectedTrack(track);
-                  map.current.flyTo([track.Latitude, track.Longitude], 13, { duration: 1.5 });
+                  map.current.flyTo([track.Latitude, track.Longitude], 10, { duration: 1.5 });
                   L.DomEvent.stopPropagation(e);
                });
 
@@ -287,7 +287,7 @@ function App() {
                if (bounds.isValid()) {
                   setTimeout(() => {
                      map.current.invalidateSize();
-                     map.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+                     map.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
                   }, 100);
                }
             } catch (err) {
@@ -454,7 +454,7 @@ function App() {
    const selectTrackFromWishlist = (track) => {
       setSelectedTrack(track);
       setShowWishlist(false);
-      map.current.flyTo([track.Latitude, track.Longitude], 13, { duration: 1.5 });
+      map.current.flyTo([track.Latitude, track.Longitude], 10, { duration: 1.5 });
    };
 
    // 1. DATA GLOSSARY
