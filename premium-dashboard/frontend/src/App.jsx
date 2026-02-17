@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const MP_ORANGE = '#FF6600';
 
@@ -175,36 +175,44 @@ function App() {
       }
    };
 
+   const getFilteredTracks = useCallback(() => {
+      if (tracks.length === 0) return [];
+
+      return tracks.filter(t => {
+         const matchesType = (activeFilters.indoor && t.is_indoor) ||
+            (activeFilters.outdoor && t.is_outdoor) ||
+            (activeFilters.sim && t.is_sim);
+
+         const searchLower = filters.search.toLowerCase();
+         const matchesSearch = !filters.search ||
+            (t.Name && t.Name.toLowerCase().includes(searchLower)) ||
+            (t.City && t.City.toLowerCase().includes(searchLower));
+
+         const matchesMetrics = (t.disposable_income_pps >= filters.minPPS) &&
+            (t.consolidated_track_length >= filters.minLength) &&
+            (t.catchment_area_size >= filters.minReach);
+
+         const matchesAssetQuality = !filters.minAssetQuality || (t.asset_quality_score && t.asset_quality_score >= filters.minAssetQuality);
+         const matchesCapex = !filters.requireCapex || (t.sentiment_capex_score > 0.3);
+         const matchesOpex = !filters.requireOpex || (t.sentiment_opex_score > 0.3);
+
+         return matchesType && matchesSearch && matchesMetrics && matchesAssetQuality && matchesCapex && matchesOpex;
+      });
+   }, [tracks, activeFilters, filters]);
+
    useEffect(() => {
       if (tracks.length > 0) {
-         const filtered = tracks.filter(t => {
-            const matchesType = (activeFilters.indoor && t.is_indoor) ||
-               (activeFilters.outdoor && t.is_outdoor) ||
-               (activeFilters.sim && t.is_sim);
-            const searchLower = filters.search.toLowerCase();
-            const matchesSearch = !filters.search ||
-               (t.Name && t.Name.toLowerCase().includes(searchLower)) ||
-               (t.City && t.City.toLowerCase().includes(searchLower));
-            const matchesMetrics = (t.disposable_income_pps >= filters.minPPS) &&
-               (t.consolidated_track_length >= filters.minLength) &&
-               (t.catchment_area_size >= filters.minReach);
-
-            const matchesAssetQuality = !filters.minAssetQuality || (t.asset_quality_score && t.asset_quality_score >= filters.minAssetQuality);
-
-            const matchesCapex = !filters.requireCapex || (t.sentiment_capex_score > 0.3);
-            const matchesOpex = !filters.requireOpex || (t.sentiment_opex_score > 0.3);
-
-            return matchesType && matchesSearch && matchesMetrics && matchesAssetQuality && matchesCapex && matchesOpex;
-         });
-         console.log(`FILTER EFFECT: ${filtered.length} tracks matched. Refreshing markers...`);
+         const filtered = getFilteredTracks();
+         console.log(`FILTER UPDATE: ${filtered.length} tracks match current filters.`);
          addMarkers(filtered);
       }
-   }, [activeFilters, filters, tracks]);
+   }, [getFilteredTracks]);
 
    const addMarkers = (data) => {
-      if (!map.current) {
-         console.warn("addMarkers called but map.current is null");
-         return;
+      if (!map.current) return;
+
+      if (data.length === 0 && tracks.length > 0) {
+         console.warn("addMarkers called with 0 items. Filters might be too restrictive.");
       }
 
       markers.current.forEach(m => m.remove());
@@ -250,6 +258,13 @@ function App() {
 
    // Update Isochrone Layer on Selection
    useEffect(() => {
+      // DEFENSIVE FIX: If markers are missing when a track is selected, restore them immediately
+      if (tracks.length > 0 && markers.current.length === 0) {
+         console.warn("DEFENSIVE FIX: Markers were missing on selection. Restoring...");
+         const filtered = getFilteredTracks();
+         if (filtered.length > 0) addMarkers(filtered);
+      }
+
       if (!map.current || !selectedTrack) return;
 
       console.log("Effect running for selection:", selectedTrack.Name);
@@ -299,7 +314,7 @@ function App() {
       } else {
          console.warn("Selected track set, but shapes data still loading or null.");
       }
-   }, [selectedTrack, shapes]);
+   }, [selectedTrack, shapes, getFilteredTracks]);
 
    const METRIC_INFO = {
       wealth: {
